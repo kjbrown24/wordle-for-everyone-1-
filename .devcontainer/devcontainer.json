@@ -1,0 +1,13 @@
+{
+  "name": "Wordle for Everyone",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "postCreateCommand": "pip install rasa-pro",
+  "forwardPorts": [8000, 5005],
+  "portsAttributes": {
+    "8000": { "label": "Game page" },
+    "5005": { "label": "Rasa" }
+  },
+  "secrets": {
+    "RASA_LICENSE": { "description": "Your Rasa Pro license key" }
+  }
+}
