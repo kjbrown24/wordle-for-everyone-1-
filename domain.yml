@@ -1,0 +1,70 @@
+version: "3.1"
+
+# Button commands from the web page (/start_game, /get_hint).
+# They start flows directly, without waiting for the AI.
+intents:
+  - start_game
+  - get_hint
+
+slots:
+  # What the player said as their guess. The AI fills this from their words.
+  guess:
+    type: text
+    mappings:
+      - type: from_llm
+
+  # Everything below is "controlled": only our Python actions change it,
+  # so a player can't just say "I have 10 guesses" and change the game.
+  answer_word:
+    type: text
+    mappings:
+      - type: controlled
+
+  guesses_left:
+    type: float
+    initial_value: 6
+    mappings:
+      - type: controlled
+
+  board:
+    type: text
+    initial_value: ""
+    mappings:
+      - type: controlled
+
+  hints_used:
+    type: float
+    initial_value: 0
+    mappings:
+      - type: controlled
+
+  game_over:
+    type: bool
+    initial_value: false
+    mappings:
+      - type: controlled
+
+actions:
+  - action_start_game
+  - action_make_guess
+  - action_hint
+
+responses:
+  utter_ask_guess:
+    - text: "What's your guess? Say or type a 5-letter word. You can also spell it one letter at a time."
+
+  utter_play_again:
+    - text: "Would you like to play again? Just say 'new game' whenever you're ready."
+
+  utter_free_chitchat_response:
+    - text: "placeholder"
+      metadata:
+        rephrase: True
+        rephrase_prompt: |
+          The following is a conversation with a friendly assistant that plays a word guessing game like Wordle.
+          The players are older adults. The assistant is warm, patient, and uses short, clear sentences.
+          The user is making small talk. Respond briefly and kindly, then invite them to keep playing or start a new game.
+          Context / previous conversation with the user:
+          {{history}}
+          {{current_input}}
+          Suggested AI Response:

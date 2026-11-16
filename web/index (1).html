@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wordle for Everyone</title>
+<style>
+  /* =========================================================
+     COLORS (contrast checked: text 4.5:1 or more, edges 3:1 or more)
+     ========================================================= */
+  :root {
+    --page: #F4EFE6;          /* warm cream background */
+    --card: #FFFFFF;
+    --ink: #1A1A1A;
+    --muted: #4A4A4A;
+    --line: #6B6B6B;
+    --navy: #1E2A4A;          /* top bar */
+    --primary: #C2410C;       /* New game button (white text 5.2:1) */
+    --primary-dark: #8A2E08;
+    --blue: #1F3A8A;          /* other buttons */
+    --blue-dark: #142660;
+    --focus: #0B57D0;
+
+    --correct-bg: #1E6B3A;  --correct-ink: #FFFFFF;  --correct-edge: #0F3D20;
+    --present-bg: #F0B429;  --present-ink: #1A1A1A;  --present-edge: #6B4E00;
+    --absent-bg:  #4B5563;  --absent-ink:  #FFFFFF;  --absent-edge:  #2B3038;
+
+    --base: 20px;
+  }
+  body.style-contrast {
+    --correct-bg: #000000; --correct-ink: #FFFFFF; --correct-edge: #000000;
+    --present-bg: #FFFFFF; --present-ink: #000000; --present-edge: #000000;
+    --absent-bg:  #D9D9D9; --absent-ink:  #000000; --absent-edge:  #000000;
+  }
+  body.style-symbols {
+    --correct-bg: #FFFFFF; --correct-ink: #000000; --correct-edge: #000000;
+    --present-bg: #FFFFFF; --present-ink: #000000; --present-edge: #000000;
+    --absent-bg:  #FFFFFF; --absent-ink:  #000000; --absent-edge:  #000000;
+  }
+  body.size-large  { --base: 24px; }
+  body.size-xlarge { --base: 28px; }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font-family: Verdana, Arial, sans-serif; font-size: var(--base); line-height: 1.5;
+  }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* Focus ring that shows on light AND dark backgrounds */
+  :focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; box-shadow: 0 0 0 8px #FFFFFF; }
+
+  /* =========================================================
+     TOP BAR
+     ========================================================= */
+  header.topbar {
+    background: var(--navy); color: #FFFFFF;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-tiles { display: flex; gap: 3px; }
+  .brand-tiles span {
+    width: 1.3em; height: 1.3em; display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 0.75em; border-radius: 5px;
+  }
+  .brand-tiles span:nth-child(1) { background: #1E6B3A; color: #FFF; }
+  .brand-tiles span:nth-child(2) { background: #F0B429; color: #1A1A1A; }
+  .brand-tiles span:nth-child(3) { background: #FFFFFF; color: #1A1A1A; }
+  h1 { font-size: 1.25em; margin: 0; line-height: 1.2; }
+  .icon-buttons { display: flex; gap: 8px; }
+  .icon-btn {
+    background: transparent; color: #FFFFFF; border: 2px solid transparent;
+    border-radius: 12px; padding: 4px 10px; min-width: 64px; min-height: 64px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font: inherit; font-size: 0.7em; cursor: pointer;
+  }
+  .icon-btn .icon { font-size: 1.7em; line-height: 1; }
+  .icon-btn:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.5); }
+  .icon-btn:active { transform: scale(0.94); }
+
+  main { max-width: 720px; margin: 0 auto; padding: 14px 14px 30px; }
+
+  /* =========================================================
+     CLICKY BUTTONS (3D: lift on hover, press down on click)
+     ========================================================= */
+  .btn {
+    font: inherit; font-weight: bold; cursor: pointer;
+    min-height: 56px; min-width: 56px; padding: 0.35em 1em;
+    border-radius: 14px; border: 2px solid var(--blue-dark);
+    background: #FFFFFF; color: var(--blue);
+    box-shadow: 0 5px 0 var(--blue-dark);
+    transition: transform 0.08s, box-shadow 0.08s, background 0.15s;
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.4em;
+  }
+  .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 0 var(--blue-dark); background: #EEF2FF; }
+  .btn:active:not(:disabled) { transform: translateY(5px); box-shadow: 0 0 0 var(--blue-dark); }
+  .btn.primary { background: var(--primary); color: #FFFFFF; border-color: var(--primary-dark); box-shadow: 0 5px 0 var(--primary-dark); }
+  .btn.primary:hover:not(:disabled) { background: #A8380A; box-shadow: 0 7px 0 var(--primary-dark); }
+  .btn.primary:active:not(:disabled) { box-shadow: 0 0 0 var(--primary-dark); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: 0 2px 0 #999; }
+  /* Microphone button */
+  .btn.mic { border-color: #0F3D20; color: #0F3D20; box-shadow: 0 5px 0 #0F3D20; }
+  .btn.mic:hover:not(:disabled) { background: #E9F5EE; box-shadow: 0 7px 0 #0F3D20; }
+  .btn.mic:active:not(:disabled) { box-shadow: 0 0 0 #0F3D20; }
+  .btn.mic.listening { background: #1E6B3A; color: #FFFFFF; animation: listen 1.2s ease-in-out infinite; }
+  @keyframes listen { 0%,100% { box-shadow: 0 5px 0 #0F3D20, 0 0 0 0 rgba(30,107,58,0.55); } 50% { box-shadow: 0 5px 0 #0F3D20, 0 0 0 12px rgba(30,107,58,0); } }
+  .voice-tip { width: 100%; text-align: center; font-size: 0.8em; color: var(--muted); margin: 2px 0 0; }
+  .btn .count {
+    background: var(--blue); color: #FFF; border-radius: 999px; font-size: 0.75em;
+    min-width: 1.6em; height: 1.6em; display: inline-flex; align-items: center; justify-content: center;
+  }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 4px 0 14px; }
+
+  /* =========================================================
+     LEGEND (small pills)
+     ========================================================= */
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; list-style: none; padding: 0; margin: 4px 0 14px; }
+  .legend li {
+    display: flex; align-items: center; gap: 8px; background: var(--card);
+    border: 2px solid #D6CFC2; border-radius: 999px; padding: 4px 14px 4px 6px; font-size: 0.8em; font-weight: bold;
+  }
+  .legend .tile { width: 1.9em; height: 1.9em; font-size: 0.85em; }
+  .legend .tile .mark { width: 1.2em; height: 1.2em; font-size: 0.7em; bottom: -7px; right: -7px; }
+
+  /* =========================================================
+     COACH MESSAGE (speech bubble)
+     ========================================================= */
+  .coach { display: flex; gap: 12px; align-items: flex-start; margin: 0 0 14px; }
+  .coach .avatar {
+    flex: none; width: 2.4em; height: 2.4em; border-radius: 50%;
+    background: var(--navy); color: #FFF; display: flex; align-items: center; justify-content: center; font-size: 1em;
+  }
+  .bubble {
+    position: relative; flex: 1; background: var(--card); border: 3px solid var(--ink);
+    border-radius: 16px; padding: 0.6em 0.9em; min-height: 2.6em;
+  }
+  .bubble::before {
+    content: ""; position: absolute; left: -12px; top: 16px; width: 18px; height: 18px;
+    background: var(--card); border-left: 3px solid var(--ink); border-bottom: 3px solid var(--ink); transform: rotate(45deg);
+  }
+  .result-banner { display: block; font-size: 1.25em; font-weight: bold; margin-bottom: 0.2em; }
+
+  /* =========================================================
+     BOARD
+     ========================================================= */
+  .board-card {
+    background: var(--card); border-radius: 20px; padding: 18px 10px 22px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.08); margin-bottom: 14px;
+  }
+  .board { display: grid; gap: 12px; justify-content: center; }
+  .row { display: grid; grid-template-columns: repeat(5, 3em); gap: 12px; }
+  .tile {
+    position: relative; width: 3em; height: 3em;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; text-transform: uppercase;
+    border: 3px solid #A8A8A8; border-radius: 10px; background: #FFFFFF; color: var(--ink);
+  }
+  .tile .letter { font-size: 1.5em; }
+  .tile .mark {
+    position: absolute; bottom: -10px; right: -10px; width: 1.4em; height: 1.4em;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85em; line-height: 1; border-radius: 50%;
+    background: #FFFFFF; color: #000000; border: 2px solid #000000;
+  }
+  .tile .mark:empty { display: none; }
+  .row.current .tile { border-color: var(--line); border-style: dashed; }
+  .tile.typing { border: 4px solid var(--ink) !important; }
+
+  /* Each state: its own color, its own edge style, its own symbol */
+  .correct { background: var(--correct-bg); color: var(--correct-ink); border: 5px solid var(--correct-edge) !important; }
+  .present { background: var(--present-bg); color: var(--present-ink); border: 5px dashed var(--present-edge) !important; }
+  .absent  { background: var(--absent-bg);  color: var(--absent-ink);  border: 3px dotted var(--absent-edge) !important; }
+
+  /* =========================================================
+     GUESS BOX
+     ========================================================= */
+  form.entry { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; margin-top: 18px; }
+  form.entry label { font-weight: bold; }
+  #guess-input {
+    font: inherit; font-size: 1.2em; letter-spacing: 0.3em; text-transform: uppercase; text-align: center;
+    width: 7.5em; min-height: 58px; padding: 0 0.4em; border: 3px solid var(--ink); border-radius: 12px; background: #FFF;
+  }
+
+  /* =========================================================
+     KEYBOARD (3D keys)
+     ========================================================= */
+  .keyboard { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin: 0 0 18px; }
+  .krow { display: flex; justify-content: center; gap: 7px; }
+  .key {
+    font: inherit; font-weight: bold; cursor: pointer; position: relative;
+    min-width: 2.4em; min-height: 3em; padding: 0 0.3em; border-radius: 10px;
+    background: #FFFFFF; color: var(--ink); border: 2px solid #8A8A8A;
+    box-shadow: 0 4px 0 #8A8A8A; transition: transform 0.06s, box-shadow 0.06s;
+  }
+  .key:hover { background: #F3F3F3; }
+  .key:active { transform: translateY(4px); box-shadow: 0 0 0 #8A8A8A; }
+  .key.wide { min-width: 4.6em; font-size: 0.85em; background: #E7ECF8; }
+  .key .mark { position: absolute; top: 2px; right: 5px; font-size: 0.75em; }
+  .keyboard .key.correct { background: var(--correct-bg); color: var(--correct-ink); border: 3px solid var(--correct-edge) !important; box-shadow: 0 4px 0 var(--correct-edge); }
+  .keyboard .key.present { background: var(--present-bg); color: var(--present-ink); border: 3px dashed var(--present-edge) !important; box-shadow: 0 4px 0 var(--present-edge); }
+  .keyboard .key.absent  { background: var(--absent-bg);  color: var(--absent-ink);  border: 3px dotted var(--absent-edge) !important; box-shadow: 0 4px 0 var(--absent-edge); }
+
+  /* =========================================================
+     MESSAGE HISTORY
+     ========================================================= */
+  details.history { background: var(--card); border-radius: 14px; padding: 6px 14px; border: 2px solid #D6CFC2; }
+  details.history summary { cursor: pointer; font-weight: bold; min-height: 48px; display: flex; align-items: center; }
+  details.history ol { margin: 0 0 8px; padding-left: 1.4em; color: var(--muted); }
+
+  /* =========================================================
+     POP-UP WINDOWS (Settings and Help)
+     ========================================================= */
+  dialog {
+    width: min(640px, 94vw); border: none; border-radius: 22px; padding: 0;
+    font-size: var(--base); color: var(--ink); box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+  }
+  dialog::backdrop { background: rgba(20, 25, 45, 0.6); }
+  .dialog-head {
+    background: var(--navy); color: #FFF; padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .dialog-head h2 { margin: 0; font-size: 1.2em; }
+  .close-x {
+    font: inherit; font-size: 1.3em; width: 56px; height: 56px; border-radius: 50%;
+    border: 2px solid #FFF; background: transparent; color: #FFF; cursor: pointer;
+  }
+  .close-x:hover { background: rgba(255,255,255,0.15); }
+  .dialog-body { padding: 16px 20px 22px; max-height: 75vh; overflow-y: auto; }
+  fieldset { border: none; padding: 0; margin: 0 0 18px; }
+  legend { font-weight: bold; margin-bottom: 8px; font-size: 1.05em; }
+  .choices { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .choice { position: relative; }
+  .choice input { position: absolute; opacity: 0; }
+  .choice label {
+    display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;
+    min-height: 64px; padding: 10px; border: 3px solid #BDBDBD; border-radius: 14px; cursor: pointer;
+    background: #FFF; font-weight: bold; font-size: 0.85em;
+  }
+  .choice label:hover { border-color: var(--blue); background: #F5F7FF; }
+  .choice input:checked + label { border-color: var(--blue); background: #E7ECF8; box-shadow: inset 0 0 0 2px var(--blue); }
+  .choice input:checked + label::after { content: "✓ Selected"; font-size: 0.85em; color: var(--blue); }
+  .choice input:focus-visible + label { outline: 4px solid var(--focus); outline-offset: 3px; }
+  .preview { display: flex; gap: 4px; }
+  .preview .tile { width: 1.7em; height: 1.7em; font-size: 0.8em; }
+  .preview .tile .mark { display: none; }
+  .switch-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 0; border-top: 2px solid #EEE; font-weight: bold;
+  }
+  .switch-row .hint-text { display: block; font-weight: normal; font-size: 0.8em; color: var(--muted); }
+  .switch { position: relative; width: 84px; height: 46px; flex: none; }
+  .switch input { opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; position: absolute; z-index: 1; }
+  .switch .track {
+    position: absolute; inset: 0; border-radius: 999px; background: #9CA3AF; border: 2px solid #4B5563;
+    transition: background 0.2s;
+  }
+  .switch .track::after {
+    content: "OFF"; position: absolute; top: 3px; left: 4px; width: 36px; height: 36px; border-radius: 50%;
+    background: #FFF; font-size: 10px; font-weight: bold; display: flex; align-items: center; justify-content: center;
+    transition: left 0.2s; color: #333;
+  }
+  .switch input:checked + .track { background: var(--correct-bg); border-color: var(--correct-edge); }
+  .switch input:checked + .track::after { content: "ON"; left: 40px; }
+  .switch input:focus-visible + .track { outline: 4px solid var(--focus); outline-offset: 3px; }
+  .dialog-foot { display: flex; justify-content: flex-end; padding-top: 8px; }
+  .help-list li { margin-bottom: 0.5em; }
+
+  /* =========================================================
+     ANIMATIONS (turned off by "Reduce motion" or the device setting)
+     ========================================================= */
+  @keyframes pop   { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
+  @keyframes flip  { 0% { transform: rotateX(0); } 50% { transform: rotateX(90deg); } 100% { transform: rotateX(0); } }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-10px); } 40%,80% { transform: translateX(10px); } }
+  @keyframes hop   { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-16px); } }
+  .tile.pop { animation: pop 0.12s ease-out; }
+  .tile.flip { animation: flip 0.45s ease-in-out; }
+  .row.shake { animation: shake 0.4s ease-in-out; }
+  .tile.hop { animation: hop 0.5s ease-in-out; }
+  body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after { animation: none !important; transition: none !important; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+  /* =========================================================
+     SMALL PHONES
+     ========================================================= */
+  @media (max-width: 560px) {
+    header.topbar { padding: 8px 10px; }
+    .brand-tiles { display: none; }
+    main { padding: 10px 8px 24px; }
+    .krow { gap: 4px; }
+    .keyboard .key { flex: 1 1 0; min-width: 0; max-width: 2.6em; padding: 0; }
+    .keyboard .key.wide { flex: 1.6 1 0; max-width: 4.6em; font-size: 0.68em; }
+    .row { grid-template-columns: repeat(5, 2.6em); gap: 10px; }
+    .tile { width: 2.6em; height: 2.6em; }
+    #guess-input { width: 6.5em; }
+    .coach .avatar { display: none; }
+    .bubble::before { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-tiles" aria-hidden="true"><span>W</span><span>F</span><span>E</span></div>
+    <h1>Wordle for Everyone</h1>
+  </div>
+  <div class="icon-buttons">
+    <button class="icon-btn" id="help-btn" aria-haspopup="dialog">
+      <span class="icon" aria-hidden="true">?</span>Help
+    </button>
+    <button class="icon-btn" id="settings-btn" aria-haspopup="dialog">
+      <span class="icon" aria-hidden="true">⚙</span>Settings
+    </button>
+  </div>
+</header>
+
+<main>
+  <h2 class="sr-only">What the marks mean</h2>
+  <ul class="legend">
+    <li><span class="tile correct" aria-hidden="true"><span class="letter">A</span><span class="mark">✓</span></span>✓ Right spot</li>
+    <li><span class="tile present" aria-hidden="true"><span class="letter">B</span><span class="mark">~</span></span>~ Wrong spot</li>
+    <li><span class="tile absent" aria-hidden="true"><span class="letter">C</span><span class="mark">✗</span></span>✗ Not in word</li>
+  </ul>
+
+  <div class="actions">
+    <button class="btn primary" id="new-game-btn">▶ New game</button>
+    <button class="btn" id="hint-btn" disabled>💡 Hint <span class="count" id="hint-count" aria-label="hints left">3</span></button>
+    <button class="btn" id="giveup-btn" disabled>🏳 I give up</button>
+  </div>
+
+  <div class="coach">
+    <div class="avatar" aria-hidden="true">💬</div>
+    <div class="bubble" id="status" role="status" aria-live="polite">
+      Hello! Press <strong>New game</strong> to start. There is no timer, so take your time.
+    </div>
+  </div>
+
+  <section class="board-card" aria-label="Your guesses">
+    <div class="board" id="board"></div>
+
+    <form class="entry" id="entry-form">
+      <label for="guess-input">Your guess:</label>
+      <input id="guess-input" maxlength="5" autocomplete="off" autocapitalize="characters"
+             spellcheck="false" aria-describedby="entry-help" disabled>
+      <button class="btn primary" type="submit" id="submit-btn" disabled>Submit</button>
+      <button class="btn mic" type="button" id="mic-btn" aria-pressed="false" disabled>🎤 Say a word</button>
+      <p class="voice-tip" id="voice-tip">Press 🎤 and say a word, or spell it: "C, R, A, N, E". You can also say "hint", "submit", or "I give up".</p>
+      <span id="entry-help" class="sr-only">Type 5 letters and press Enter. Use Backspace to fix a mistake.</span>
+    </form>
+  </section>
+
+  <div class="keyboard" id="keyboard" aria-label="On-screen keyboard"></div>
+
+  <details class="history">
+    <summary>Show all messages</summary>
+    <ol id="log"></ol>
+  </details>
+</main>
+
+<!-- ================= SETTINGS POP-UP ================= -->
+<dialog id="settings-dialog" aria-labelledby="settings-title">
+  <div class="dialog-head">
+    <h2 id="settings-title">⚙ Settings</h2>
+    <button class="close-x" data-close aria-label="Close settings">✕</button>
+  </div>
+  <div class="dialog-body">
+    <fieldset>
+      <legend>How should the letters look?</legend>
+      <div class="choices">
+        <div class="choice">
+          <input type="radio" name="style" id="style-color" value="color">
+          <label for="style-color">
+            <span class="preview" aria-hidden="true">
+              <span class="tile" style="background:#1E6B3A;color:#FFF;border:3px solid #0F3D20">A</span>
+              <span class="tile" style="background:#F0B429;color:#1A1A1A;border:3px dashed #6B4E00">B</span>
+              <span class="tile" style="background:#4B5563;color:#FFF;border:3px dotted #2B3038">C</span>
+            </span>
+            Color and symbols
+          </label>
+        </div>
+        <div class="choice">
+          <input type="radio" name="style" id="style-contrast" value="contrast">
+          <label for="style-contrast">
+            <span class="preview" aria-hidden="true">
+              <span class="tile" style="background:#000;color:#FFF;border:3px solid #000">A</span>
+              <span class="tile" style="background:#FFF;color:#000;border:3px dashed #000">B</span>
+              <span class="tile" style="background:#D9D9D9;color:#000;border:3px dotted #000">C</span>
+            </span>
+            High contrast
+          </label>
+        </div>
+        <div class="choice">
+          <input type="radio" name="style" id="style-symbols" value="symbols">
+          <label for="style-symbols">
+            <span class="preview" aria-hidden="true">
+              <span class="tile" style="border:3px solid #000">✓</span>
+              <span class="tile" style="border:3px dashed #000">~</span>
+              <span class="tile" style="border:3px dotted #000">✗</span>
+            </span>
+            Symbols only
+          </label>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Text size</legend>
+      <div class="choices">
+        <div class="choice">
+          <input type="radio" name="size" id="size-normal" value="normal">
+          <label for="size-normal"><span style="font-size:20px">Aa</span>Normal</label>
+        </div>
+        <div class="choice">
+          <input type="radio" name="size" id="size-large" value="large">
+          <label for="size-large"><span style="font-size:28px">Aa</span>Large</label>
+        </div>
+        <div class="choice">
+          <input type="radio" name="size" id="size-xlarge" value="xlarge">
+          <label for="size-xlarge"><span style="font-size:36px">Aa</span>Extra large</label>
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="switch-row">
+      <label for="read-aloud">🔊 Read results aloud
+        <span class="hint-text">The game speaks each result.</span></label>
+      <span class="switch"><input type="checkbox" id="read-aloud" role="switch"><span class="track"></span></span>
+    </div>
+    <div class="switch-row">
+      <label for="reduce-motion">🐢 Reduce motion
+        <span class="hint-text">Turns off flips, shakes, and hops.</span></label>
+      <span class="switch"><input type="checkbox" id="reduce-motion" role="switch"><span class="track"></span></span>
+    </div>
+    <div class="switch-row">
+      <label for="click-sounds">🔔 Click sounds
+        <span class="hint-text">A soft tap sound when you press keys.</span></label>
+      <span class="switch"><input type="checkbox" id="click-sounds" role="switch"><span class="track"></span></span>
+    </div>
+
+    <div class="dialog-foot">
+      <button class="btn primary" data-close>Done</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- ================= HELP POP-UP ================= -->
+<dialog id="help-dialog" aria-labelledby="help-title">
+  <div class="dialog-head">
+    <h2 id="help-title">? How to play</h2>
+    <button class="close-x" data-close aria-label="Close help">✕</button>
+  </div>
+  <div class="dialog-body">
+    <ol class="help-list">
+      <li>Press <strong>New game</strong>.</li>
+      <li>Type a 5-letter word, or tap the letters. Press <strong>Enter</strong> or <strong>Submit</strong>.</li>
+      <li>Each letter gets a mark:
+        <ul>
+          <li><strong>✓</strong> right letter, right spot</li>
+          <li><strong>~</strong> in the word, but in a different spot</li>
+          <li><strong>✗</strong> not in the word</li>
+        </ul>
+      </li>
+      <li>You have 6 guesses. If a word is not real, it does not count.</li>
+      <li>Stuck? Press <strong>Hint</strong>. Hints never cost a guess.</li>
+      <li>Want to stop? Press <strong>I give up</strong> and you'll see the word.</li>
+      <li>Prefer to talk? Press <strong>🎤 Say a word</strong> and say your guess, or spell it one letter at a time. The word appears on the board first, so you can check it. Then press <strong>Submit</strong> or say "submit".</li>
+      <li>You can also say "hint", "I give up", "clear", or "new game".</li>
+      <li>Change text size and colors with <strong>⚙ Settings</strong> at the top.</li>
+    </ol>
+    <div class="dialog-foot"><button class="btn primary" data-close>Got it</button></div>
+  </div>
+</dialog>
+
+<script>
+// ---------- Where the Rasa bot is running ----------
+// 1. If the address has ?server=https://..., use that.
+// 2. On a GitHub Codespaces link (the page on port 8000), Rasa is the same link on port 5005.
+// 3. Otherwise, Rasa on this computer.
+const params = new URLSearchParams(location.search);
+function findServer() {
+  if (params.get("server")) return params.get("server");
+  if (location.hostname.endsWith(".app.github.dev")) {
+    return location.protocol + "//" + location.hostname.replace(/-\d+\.app\.github\.dev$/, "-5005.app.github.dev");
+  }
+  return "http://localhost:5005";
+}
+const SERVER = findServer().replace(/\/$/, "");
+const RASA_URL = SERVER + "/webhooks/rest/webhook";
+
+// Each browser tab gets its own anonymous player ID (no names are stored).
+const SENDER = "player_" + Math.random().toString(36).slice(2, 10);
+
+const WORD_LENGTH = 5;
+const FLIP_STEP = 250;   // ms between each tile flip
+let maxGuesses = 6;
+let rowIndex = 0;
+let gameActive = false;
+let waiting = false;
+const keyStates = {};
+
+const $ = (id) => document.getElementById(id);
+const MARK = { correct: "✓", present: "~", absent: "✗" };
+const SAY  = { correct: "correct", present: "in the word, wrong spot", absent: "not in the word" };
+
+// ---------- Settings (remembered in this browser) ----------
+function loadSetting(name, fallback) {
+  try { return localStorage.getItem(name) || fallback; } catch (e) { return fallback; }
+}
+function saveSetting(name, value) {
+  try { localStorage.setItem(name, value); } catch (e) {}
+}
+function motionOff() {
+  return $("reduce-motion").checked || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+function applySettings() {
+  const style = document.querySelector('input[name="style"]:checked').value;
+  const size = document.querySelector('input[name="size"]:checked').value;
+  document.body.className = "";
+  document.body.classList.add("style-" + style, "size-" + size);
+  if ($("reduce-motion").checked) document.body.classList.add("reduce-motion");
+  saveSetting("feedbackStyle", style);
+  saveSetting("textSize", size);
+  saveSetting("readAloud", $("read-aloud").checked ? "yes" : "no");
+  saveSetting("reduceMotion", $("reduce-motion").checked ? "yes" : "no");
+  saveSetting("clickSounds", $("click-sounds").checked ? "yes" : "no");
+}
+$("style-" + loadSetting("feedbackStyle", "color")).checked = true;
+$("size-" + loadSetting("textSize", "normal")).checked = true;
+$("read-aloud").checked = loadSetting("readAloud", "no") === "yes";
+$("reduce-motion").checked = loadSetting("reduceMotion", "no") === "yes";
+$("click-sounds").checked = loadSetting("clickSounds", "no") === "yes";
+document.querySelectorAll("#settings-dialog input").forEach(el => el.addEventListener("change", applySettings));
+applySettings();
+
+// ---------- Pop-up windows ----------
+$("settings-btn").addEventListener("click", () => $("settings-dialog").showModal());
+$("help-btn").addEventListener("click", () => $("help-dialog").showModal());
+document.querySelectorAll("[data-close]").forEach(btn =>
+  btn.addEventListener("click", () => btn.closest("dialog").close()));
+// Clicking the dark area outside a pop-up also closes it.
+document.querySelectorAll("dialog").forEach(d =>
+  d.addEventListener("click", e => { if (e.target === d) d.close(); }));
+
+// ---------- Soft click sound (optional) ----------
+let audioCtx = null;
+function clickSound() {
+  if (!$("click-sounds").checked) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+    osc.frequency.value = 520;
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.08);
+  } catch (e) {}
+}
+document.addEventListener("click", e => { if (e.target.closest("button")) clickSound(); });
+
+// ---------- Board ----------
+function buildBoard() {
+  const board = $("board");
+  board.innerHTML = "";
+  for (let r = 0; r < maxGuesses; r++) {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.setAttribute("role", "group");
+    row.setAttribute("aria-label", `Guess ${r + 1}: empty`);
+    for (let c = 0; c < WORD_LENGTH; c++) {
+      const tile = document.createElement("div");
+      tile.className = "tile";
+      tile.innerHTML = '<span class="letter"></span><span class="mark" aria-hidden="true"></span>';
+      row.appendChild(tile);
+    }
+    board.appendChild(row);
+  }
+  markCurrentRow();
+}
+
+function markCurrentRow() {
+  document.querySelectorAll(".row").forEach((row, i) => row.classList.toggle("current", i === rowIndex && gameActive));
+}
+
+// Show letters as they are typed; the newest letter "pops".
+let lastLength = 0;
+function showTyping() {
+  const row = $("board").children[rowIndex];
+  if (!row) return;
+  const text = $("guess-input").value.toUpperCase();
+  [...row.children].forEach((tile, i) => {
+    tile.querySelector(".letter").textContent = text[i] || "";
+    tile.classList.toggle("typing", !!text[i]);
+    if (i === text.length - 1 && text.length > lastLength) {
+      tile.classList.remove("pop"); void tile.offsetWidth; tile.classList.add("pop");
+    }
+  });
+  lastLength = text.length;
+}
+
+// Reveal a scored row. Tiles flip one by one (or all at once with reduced motion).
+// Returns how long the reveal takes, in milliseconds.
+function fillRow(guess, result) {
+  const row = $("board").children[rowIndex];
+  const animate = !motionOff();
+  [...row.children].forEach((tile, i) => {
+    const reveal = () => {
+      tile.classList.remove("typing");
+      tile.classList.add(result[i]);
+      tile.querySelector(".letter").textContent = guess[i].toUpperCase();
+      tile.querySelector(".mark").textContent = MARK[result[i]];
+    };
+    tile.setAttribute("aria-label", `${guess[i].toUpperCase()}, ${SAY[result[i]]}`);
+    if (animate) {
+      setTimeout(() => { tile.classList.add("flip"); setTimeout(reveal, 225); }, i * FLIP_STEP);
+    } else {
+      reveal();
+    }
+  });
+  const spoken = result.map((s, i) => `${guess[i].toUpperCase()} ${SAY[s]}`).join(", ");
+  row.setAttribute("aria-label", `Guess ${rowIndex + 1}: ${guess.toUpperCase()}. ${spoken}`);
+  return animate ? WORD_LENGTH * FLIP_STEP + 250 : 0;
+}
+
+function shakeRow() {
+  const row = $("board").children[rowIndex];
+  if (!row || motionOff()) return;
+  row.classList.remove("shake"); void row.offsetWidth; row.classList.add("shake");
+}
+
+function celebrate(row) {
+  if (motionOff()) return;
+  [...row.children].forEach((tile, i) => setTimeout(() => {
+    tile.classList.remove("flip"); void tile.offsetWidth; tile.classList.add("hop");
+  }, i * 100));
+}
+
+// ---------- On-screen keyboard ----------
+const KEY_ROWS = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"];
+function buildKeyboard() {
+  const kb = $("keyboard");
+  kb.innerHTML = "";
+  KEY_ROWS.forEach((letters, r) => {
+    const row = document.createElement("div");
+    row.className = "krow";
+    if (r === 2) row.appendChild(makeKey("Enter", "Submit guess", true));
+    for (const ch of letters) row.appendChild(makeKey(ch, ch));
+    if (r === 2) row.appendChild(makeKey("Delete", "Delete last letter", true));
+    kb.appendChild(row);
+  });
+}
+function makeKey(value, label, wide) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "key" + (wide ? " wide" : "");
+  b.dataset.key = value;
+  b.innerHTML = `<span>${value === "Delete" ? "⌫ Delete" : value === "Enter" ? "Enter ↵" : value}</span><span class="mark" aria-hidden="true"></span>`;
+  b.setAttribute("aria-label", label);
+  b.addEventListener("click", () => pressKey(value));
+  return b;
+}
+function pressKey(value) {
+  if (!gameActive || waiting) return;
+  const input = $("guess-input");
+  if (value === "Enter") { submitGuess(); return; }
+  if (value === "Delete") input.value = input.value.slice(0, -1);
+  else if (input.value.length < WORD_LENGTH) input.value += value.toLowerCase();
+  showTyping();
+}
+function updateKeyboard(guess, result) {
+  const rank = { absent: 1, present: 2, correct: 3 };
+  [...guess.toUpperCase()].forEach((ch, i) => {
+    const s = result[i];
+    if (!keyStates[ch] || rank[s] > rank[keyStates[ch]]) keyStates[ch] = s;
+  });
+  document.querySelectorAll(".key").forEach(key => {
+    const ch = key.dataset.key, s = keyStates[ch];
+    key.classList.remove("correct", "present", "absent");
+    if (s && ch.length === 1) {
+      key.classList.add(s);
+      key.querySelector(".mark").textContent = MARK[s];
+      key.setAttribute("aria-label", `${ch}, ${SAY[s]}`);
+    }
+  });
+}
+
+// ---------- Messages and read aloud ----------
+function say(lines, bannerHtml = "") {
+  if (typeof lines === "string") lines = [lines];
+  const text = lines.join(" ");
+  $("status").innerHTML = bannerHtml ? bannerHtml + " " : "";   // space so screen readers pause after the banner
+  $("status").append(document.createTextNode(text));
+  const li = document.createElement("li");
+  li.textContent = (bannerHtml ? $("status").querySelector(".result-banner").textContent + " " : "") + text;
+  $("log").prepend(li);
+  if ($("read-aloud").checked && "speechSynthesis" in window) {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(li.textContent);
+    u.rate = 0.9;
+    speechSynthesis.speak(u);
+  }
+}
+
+function setWaiting(on) {
+  waiting = on;
+  $("submit-btn").disabled = on || !gameActive;
+  $("mic-btn").disabled = on || !gameActive;
+  $("hint-btn").disabled = on || !gameActive;
+  $("giveup-btn").disabled = on || !gameActive;
+  $("new-game-btn").disabled = on;
+}
+
+// ---------- Talking to Rasa ----------
+async function sendToRasa(message) {
+  setWaiting(true);
+  try {
+    // Stop waiting after 20 seconds, so the buttons never stay gray.
+    const res = await fetch(RASA_URL, {
+      signal: AbortSignal.timeout(20000),
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sender: SENDER, message })
+    });
+    if (!res.ok) throw new Error("Server answered " + res.status);
+    await handleReplies(await res.json());
+  } catch (err) {
+    say(err.name === "TimeoutError"
+      ? "The game helper is taking too long. Please press the button again."
+      : "I can't reach the game helper right now. Please check that Rasa is running, then try again.");
+  } finally {
+    setWaiting(false);
+  }
+}
+
+const SKIP = ["Your guesses so far", "What's your guess", "Would you like to play again"];
+// Rasa adds this line when a game ends; the page already says "Press New game".
+const SKIP_ANYWHERE = ["anything else i can help"];
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function handleReplies(replies) {
+  if (!replies.length) {
+    say("The game helper didn't answer. Please try again.");
+    return;
+  }
+  const lines = [];
+  let banner = "";
+  let delay = 0;
+  let wonRow = null;
+  const descriptions = replies.filter(r => r.custom && r.custom.description).map(r => r.custom.description);
+  for (const r of replies) {
+    if (r.text && descriptions.includes(r.text.trim())) continue;
+    if (r.custom) {
+      const out = handleData(r.custom, lines);
+      if (out.banner) banner = out.banner;
+      if (out.delay) delay = out.delay;
+      if (out.wonRow) wonRow = out.wonRow;
+    } else if (r.text && !SKIP.some(s => r.text.startsWith(s))
+               && !SKIP_ANYWHERE.some(s => r.text.toLowerCase().includes(s))) {
+      lines.push(r.text);
+    }
+  }
+  if (banner) lines.push("Press New game to play again.");
+  // Wait for the tiles to finish flipping before showing (and speaking) the result.
+  if (delay) await wait(delay);
+  if (lines.length) say(lines, banner);
+  if (wonRow) celebrate(wonRow);
+}
+
+// Handles the data our Rasa actions send (see json_message in actions.py).
+function handleData(data, lines) {
+  const out = {};
+  if (data.type === "new_game") {
+    maxGuesses = data.max_guesses || 6;
+    rowIndex = 0;
+    lastLength = 0;
+    gameActive = true;
+    Object.keys(keyStates).forEach(k => delete keyStates[k]);
+    $("hint-count").textContent = "3";
+    buildBoard();
+    buildKeyboard();
+    $("guess-input").disabled = false;
+    $("guess-input").value = "";
+    setTimeout(() => $("guess-input").focus(), 0);
+  }
+  if (data.type === "invalid_guess") {
+    shakeRow();                       // gentle "try again" wiggle; no guess was used
+    setTimeout(() => $("guess-input").focus(), 0);
+  }
+  if (data.type === "guess_result") {
+    const row = $("board").children[rowIndex];
+    out.delay = fillRow(data.guess, data.result);
+    setTimeout(() => updateKeyboard(data.guess, data.result), out.delay);
+    lines.push(`${data.guess.toUpperCase()}: ${data.description}`);
+    rowIndex++;
+    lastLength = 0;
+    $("guess-input").value = "";
+    markCurrentRow();
+    if (data.game_over) {
+      endGame();
+      if (data.won) out.wonRow = row;
+      out.banner = `<span class="result-banner">${data.won ? "🎉 You won!" : "Game over"}</span>`;
+    } else {
+      setTimeout(() => $("guess-input").focus(), 0);
+    }
+  }
+  if (data.type === "hint") {
+    $("hint-count").textContent = String(data.hints_left);
+    setTimeout(() => $("guess-input").focus(), 0);
+  }
+  if (data.type === "gave_up") {
+    endGame();
+    out.banner = `<span class="result-banner">The word was ${data.answer.toUpperCase()}</span>`;
+  }
+  return out;
+}
+
+function endGame() {
+  gameActive = false;
+  $("guess-input").disabled = true;
+  markCurrentRow();
+  setTimeout(() => $("new-game-btn").focus(), 0);
+}
+
+// ---------- Player actions ----------
+function submitGuess() {
+  if (!gameActive || waiting) return;
+  const word = $("guess-input").value.trim().toLowerCase();
+  if (word.length !== WORD_LENGTH || !/^[a-z]+$/.test(word)) {
+    shakeRow();
+    say(`Please type ${WORD_LENGTH} letters. You have ${word.length}. This did not use a guess.`);
+    $("guess-input").focus();
+    return;
+  }
+  // Fills the "guess" slot directly, so guesses work even if the AI helper is busy.
+  sendToRasa(`/SetSlots(guess=${word})`);
+}
+
+$("entry-form").addEventListener("submit", (e) => { e.preventDefault(); submitGuess(); });
+$("guess-input").addEventListener("input", () => {
+  const input = $("guess-input");
+  input.value = input.value.replace(/[^a-zA-Z]/g, "").slice(0, WORD_LENGTH);
+  showTyping();
+});
+
+// Buttons send short commands (like a Rasa button payload), so they work
+// even when the AI helper is busy.
+$("new-game-btn").addEventListener("click", async () => {
+  if (gameActive) {
+    if (!confirm("Start a new game? This will end the game you are playing now.")) return;
+    await sendToRasa("/SetSlots(guess=giveup)");
+  }
+  sendToRasa("/start_game");
+});
+$("hint-btn").addEventListener("click", () => sendToRasa("/SetSlots(guess=hint)"));
+$("giveup-btn").addEventListener("click", () => sendToRasa("/SetSlots(guess=giveup)"));
+
+// =========================================================
+// VOICE PLAY (Enhancement, Category B)
+// Uses the browser's speech recognition (Chrome, Edge, Safari).
+// What the player says is shown on the board FIRST, so a misheard
+// word never uses up a guess. The player then presses Submit or says "submit".
+// =========================================================
+
+// Letter names people say when spelling, and what speech recognition often writes for them.
+const LETTER_NAMES = {
+  a: ["a", "ay", "eh"], b: ["b", "be", "bee"], c: ["c", "see", "sea", "cee"], d: ["d", "dee"],
+  e: ["e", "ee"], f: ["f", "ef", "eff"], g: ["g", "gee", "jee"], h: ["h", "aitch", "age"],
+  i: ["i", "eye"], j: ["j", "jay"], k: ["k", "kay"], l: ["l", "el", "ell"],
+  m: ["m", "em"], n: ["n", "en"], o: ["o", "oh"], p: ["p", "pee", "pea"],
+  q: ["q", "queue", "cue"], r: ["r", "are", "ar"], s: ["s", "es", "ess"], t: ["t", "tee", "tea"],
+  u: ["u", "you"], v: ["v", "vee"], w: ["w", "doubleu"], x: ["x", "ex"],
+  y: ["y", "why", "wie"], z: ["z", "zee", "zed"]
+};
+const NAME_TO_LETTER = {};
+for (const [letter, names] of Object.entries(LETTER_NAMES)) names.forEach(n => NAME_TO_LETTER[n] = letter);
+
+// Turns what was heard into a command, some spelled letters, or a whole word.
+function parseSpeech(alternatives) {
+  for (const raw of alternatives) {
+    const text = raw.toLowerCase().replace(/double[\s-]u/g, "doubleu").replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
+    if (!text) continue;
+
+    // Spoken commands
+    if (/\bhint\b|\bclue\b/.test(text)) return { command: "hint" };
+    if (/give up|show me the (word|answer)/.test(text)) return { command: "giveup" };
+    if (/new game|start over|play again/.test(text)) return { command: "newgame" };
+    if (/^(submit|enter|send|check|guess|yes|go)( it| that| please)?$/.test(text)) return { command: "submit" };
+    if (/^(clear|delete|erase|undo|backspace)( it| that| please)?$/.test(text)) return { command: "clear" };
+
+    // Spelled out: "c r a n e", "see are ay en ee", or "c as in cat, r as in rose..."
+    const words = text.replace(/\bas in [a-z]+/g, " ").split(" ").filter(Boolean);
+    const letters = words.map(w => NAME_TO_LETTER[w]);
+    if (words.length >= 2 && letters.every(Boolean)) return { letters: letters.join("") };
+
+    // A whole word: "crane" or "my guess is crane" (use the last 5-letter word heard)
+    const fives = words.filter(w => w.length === WORD_LENGTH);
+    if (fives.length) return { word: fives[fives.length - 1] };
+  }
+  // A single spoken letter, like "c"
+  const one = (alternatives[0] || "").toLowerCase().replace(/[^a-z]/g, "");
+  if (NAME_TO_LETTER[one]) return { letters: NAME_TO_LETTER[one] };
+  return null;
+}
+
+const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognizer = null;
+let listening = false;
+
+function stopListening() {
+  listening = false;
+  $("mic-btn").classList.remove("listening");
+  $("mic-btn").setAttribute("aria-pressed", "false");
+  $("mic-btn").textContent = "🎤 Say a word";
+}
+
+function startListening() {
+  if (!Recognition) {
+    say("Voice isn't available in this web browser. Please try Chrome, Edge, or Safari, or type your guess.");
+    return;
+  }
+  if (listening) { recognizer.stop(); return; }   // pressing again stops listening
+  if ("speechSynthesis" in window) speechSynthesis.cancel();   // don't let the game hear itself
+
+  recognizer = new Recognition();
+  recognizer.lang = "en-US";
+  recognizer.interimResults = false;
+  recognizer.maxAlternatives = 5;
+
+  recognizer.onresult = (event) => {
+    const alts = [...event.results[0]].map(a => a.transcript);
+    handleSpeech(alts);
+  };
+  recognizer.onerror = (event) => {
+    if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+      say("I need permission to use the microphone. Please allow it in your browser, then press 🎤 again.");
+    } else if (event.error === "no-speech") {
+      say("I didn't hear anything. Press 🎤 and try again, a little louder or closer.");
+    } else {
+      say("Sorry, I couldn't hear that. Please press 🎤 and try again, or type your guess.");
+    }
+  };
+  recognizer.onend = stopListening;
+
+  listening = true;
+  $("mic-btn").classList.add("listening");
+  $("mic-btn").setAttribute("aria-pressed", "true");
+  $("mic-btn").textContent = "🎤 Listening… tap to stop";
+  try { recognizer.start(); } catch (e) { stopListening(); }
+}
+
+function handleSpeech(alternatives) {
+  const result = parseSpeech(alternatives);
+  const heard = alternatives[0] || "";
+  const input = $("guess-input");
+
+  if (!result) {
+    say(`I heard "${heard}", but not a 5-letter word. Please try again, or spell it one letter at a time.`);
+    return;
+  }
+  if (result.command === "hint") { $("hint-btn").click(); return; }
+  if (result.command === "giveup") { $("giveup-btn").click(); return; }
+  if (result.command === "newgame") { $("new-game-btn").click(); return; }
+  if (result.command === "clear") { input.value = ""; showTyping(); say("Cleared. Say or type a new word."); return; }
+  if (result.command === "submit") { submitGuess(); return; }
+
+  if (result.word) {
+    input.value = result.word;
+  } else {
+    // Spelled letters are added on, so a word can be spelled across several presses.
+    input.value = (input.value + result.letters).slice(0, WORD_LENGTH);
+  }
+  showTyping();
+
+  const shown = input.value.toUpperCase();
+  if (shown.length === WORD_LENGTH) {
+    say(`I heard ${shown.split("").join(" ")}. If that's right, press Submit or say "submit". If not, press 🎤 and try again.`);
+  } else {
+    say(`So far: ${shown.split("").join(" ")}. Press 🎤 and say the next letters.`);
+  }
+}
+
+$("mic-btn").addEventListener("click", startListening);
+
+buildBoard();
+buildKeyboard();
+</script>
+</body>
+</html>

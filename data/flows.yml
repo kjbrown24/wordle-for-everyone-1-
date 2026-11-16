@@ -1,0 +1,40 @@
+flows:
+  play_wordle:
+    name: play wordle
+    description: >
+      Start a new word guessing game, like Wordle. Use when the user wants to
+      play, start a game, start a new game, or play again.
+    nlu_trigger:
+      - intent: start_game
+    steps:
+      - action: action_start_game
+
+      - id: ask_guess
+        collect: guess
+        ask_before_filling: true
+        description: >
+          The player's guessed word. Save only the word itself, in lowercase,
+          exactly as the player said or spelled it, even if it is not a real word.
+          If the player spells it letter by letter, join the letters into one word.
+          If the player says they give up or want to see the answer, save "giveup".
+
+      - action: action_make_guess
+        next:
+          - if: slots.game_over
+            then:
+              - action: utter_play_again
+                next: END
+          - else:
+              - id: clear_guess
+                set_slots:
+                  - guess: null
+                next: ask_guess
+
+  get_hint:
+    name: get a hint
+    description: >
+      The player asks for a hint, a clue, or some help figuring out the hidden word.
+    nlu_trigger:
+      - intent: get_hint
+    steps:
+      - action: action_hint
