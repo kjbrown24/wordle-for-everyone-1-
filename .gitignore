@@ -1,0 +1,12 @@
+# Never upload keys
+license.txt
+deepgram.txt
+.env
+
+# Built or local files
+models/
+.rasa/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
